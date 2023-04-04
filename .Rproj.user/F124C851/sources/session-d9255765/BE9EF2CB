@@ -3,7 +3,7 @@
     "path": "~/Documents/GitHub/ACTL4001/Test/Trial 1.Rmd",
     "project_path": "Trial 1.Rmd",
     "type": "r_markdown",
-    "hash": "1477574126",
+    "hash": "0",
     "contents": "",
     "dirty": false,
     "created": 1680604086922.0,
@@ -11,7 +11,9 @@
     "relative_order": 2,
     "properties": {
         "source_window_id": "",
-        "Source": "Sourcephrcg3i96ix5"
+        "Source": "Sourcephrcg3i96ix5",
+        "cursorPosition": "62,30",
+        "scrollLine": "34"
     },
     "folds": "",
     "lastKnownWriteTime": 1680584516,
