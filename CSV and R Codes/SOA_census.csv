@@ -1,0 +1,44 @@
+﻿,Region 1 ,Region 2,Region 3 ,Region 4,Region 5 ,Region 6 
+"Census, July 1, 2021",6406008,4386948,5019684,995544,1257096,313836
+"Census, July 1, 2020",6306408,4212348,4993764,1010676,1266672,307884
+"Census, July 1, 2019",5414700,3231492,4614048,1110012,1289472,323820
+Percent over age 18  ,0.772,0.827,0.785,0.781,0.76,0.827
+Percent age 65 and older,0.165,0.261,0.137,0.209,0.172,0.2
+Housing Units,2791896,2523732,2212536,496548,566592,135480
+Owner-Occupied Housing Units,1904073,1862514,1323096,333680,365451,102693
+Median Value of Owner-Occupied Housing Units (Ꝕ),"260,765","248,083","221,267","121,135","158,255","175,164"
+Median Monthly Homeowner Housing Costs (Ꝕ),"1,726","1,644","1,731","1,474","1,438","1,486"
+Median Rent (Ꝕ),"1,260","1,287","1,318",923,"1,068",882
+"Building Permits, 2021",95568,83640,39156,1080,4656,2328
+"Labor Force (percent over age 16 and older), 2016-2020",0.648,0.553,0.627,0.549,0.557,0.51
+"Total accommodation and food services sales, 2017 (Ꝕ1,000)",22342094,36406400,17508375,2774258,2611585,151132
+"Total health care and social assistance receipts/revenue, 2017 (Ꝕ1,000)",51556220,26864638,70145543,6658061,9541905,697773
+"Total transportation and warehousing receipts/revenue, 2017 (Ꝕ1,000)",13500228,2862506,3929251,2234577,2307892,
+"Total retail sales, 2017 (Ꝕ1,000)",120644546,104661514,86911348,16147988,17600539,2241932
+"Total retail sales per capita, 2017 (Ꝕ)","19,811","26,171","17,558","15,350","13,758","6,959"
+"Households, 2016-2020",2376180,1634628,1865736,403548,500448,110052
+"Persons per Household, 2016-2020",2.55,2.49,2.47,2.5,2.5,2.65
+Median Household Income (Ꝕ),"82,459","68,123","71,916","48,615","61,518","69,340"
+Prior Year Per Capita Income (Ꝕ),"45,482","38,381","40,937","28,186","32,418","35,948"
+"Persons in poverty, percent",0.121,0.128,0.16,0.191,0.205,0.168
+"Total Number of Employers, 2020",170172,113688,110220,18924,21132,3888
+"Total Employment, 2020",2990424,1412112,1941528,284904,388428,65676
+"Total Annual Payroll (Ꝕ1,000)",186551503,60187999,116972082,14470878,20694659,2989576
+Population per hectare,2.58,1.19,2.12,0.29,0.61,0.19
+Land area in hectares,2442659,3522311,2353615,3438613,2067059,1556199
+"GDP, 2020 (Ꝕ1,000 )",531771287,222153795,417708522,45815957,69643447,9845914
+"GDP, 2019 (Ꝕ1,000 )",534828123,223457321,414066160,46354925,68360180,9766147
+Temporary housing cost with disaster (Ꝕ per person per month),"1,920","1,829","1,925","1,639","1,599","1,653"
+Property Value distribution <Ꝕ50K,0.043,0.0633,0.0356,0.1882,0.0996,0.0759
+Property Value distribution Ꝕ50K-Ꝕ99K,0.0459,0.0537,0.0623,0.1888,0.1397,0.1579
+Property Value distribution Ꝕ100K-Ꝕ149K,0.0695,0.0693,0.1123,0.1578,0.1891,0.1336
+Property Value distribution Ꝕ150K-Ꝕ199K,0.1604,0.1531,0.2161,0.1726,0.1867,0.1605
+Property Value distribution Ꝕ200K-Ꝕ249K,0.1078,0.112,0.1053,0.0876,0.1192,0.1025
+Property Value distribution Ꝕ250K-Ꝕ299K,0.0818,0.0947,0.0761,0.0337,0.0679,0.0582
+Property Value distribution Ꝕ300K-Ꝕ399K,0.2292,0.2444,0.1894,0.1013,0.126,0.1702
+Property Value distribution Ꝕ400K-Ꝕ499K,0.1151,0.1126,0.1008,0.0291,0.0419,0.0801
+Property Value distribution Ꝕ500K-Ꝕ749K,0.0528,0.0486,0.0434,0.0183,0.0139,0.0305
+Property Value distribution Ꝕ750K-Ꝕ999K,0.0573,0.031,0.0426,0.0108,0.009,0.0158
+Property Value distribution Ꝕ1M-Ꝕ1.499K,0.0199,0.008,0.0087,0.0026,0.0018,0.0108
+Property Value distribution Ꝕ1.5M-Ꝕ1.99M,0.0113,0.0056,0.0036,0.006,0.0003,0
+Property Value distribution >=Ꝕ2M,0.006,0.0037,0.0038,0.0032,0.0049,0.004
