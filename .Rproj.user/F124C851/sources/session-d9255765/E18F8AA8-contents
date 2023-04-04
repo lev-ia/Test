@@ -1,0 +1,401 @@
+---
+title: "Trial 1"
+author: "Levia"
+output: html_document
+date: "2023-04-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is a trial for R Markdown 
+Today is 4 April 2023
+
+Triple ' followed by {r} will start an r block
+e.g. Loading library  
+all library used in this project
+``` {r, warning = FALSE, message = FALSE}
+library(actuar)
+library(cluster)
+library(dplyr)
+library(EnvStats)
+library(factoextra)
+library(fitdistrplus)
+library(ggplot2)
+library(goftest)
+library(MASS)
+library(randomForest)
+library(readr)
+library(readxl)
+library(rmarkdown)
+library(stringi)
+library(stringr)
+library(tibble)
+library(tidyr)
+library(tidyverse)
+```
+
+e.g. loading data
+``` {r}
+load(file = "census.RData")
+load(file = "emissions.RData")
+load(file = "hazards.RData")
+load(file = "inflation.RData")
+load(file = "rates.RData")
+```
+
+e.g. glimpse
+```{r}
+glimpse(inflation)
+```
+
+### OK LOADING DONE
+note to self:  
+original data was csv which cant be read somehow here,  
+so do read.csv of each files according to each form.  
+then do save each files to .RData form. 
+then load it to the rmd space.  
+[RMarkdown Cheat Sheet](https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf)
+  
+## NEXT seperate the EDA, Fitting, and Simulation
+
+
+
+
+# 1. Prelim_Clustering ####
+Initially we try to cluster the hazards based on it's event and the damages it brought.  
+```{r, warning=FALSE, message=FALSE}
+# Setting up the environment, load the necessary packages
+library(cluster)
+library(dplyr)
+library(factoextra)
+library(ggplot2)
+library(readr)
+library(stringi)
+library(tidyverse)
+```
+
+**Load the data**
+```{r, eval=TRUE} 
+load(file = "hazards.RData")
+glimpse(hazards)
+```
+**Data Cleaning**  
+
+* Change the `Region` column from integer to character  
+  
+* Filter event that has impact, identified from:  
+  
+  + Property damage > 0 or  
+    
+  + Injuries > 0 or  
+    
+  + Fatalities > 0  
+```{r}
+hazards$Region = as.character(hazards$Region)
+hazards = hazards %>%
+  filter(hazards$Property.Damage > 0 | hazards$Injuries > 0 | hazards$Fatalities > 0)
+glimpse(hazards)
+head(hazards, 5)
+```
+_Additional Steps_
+```{r}
+# combine anything with flooding & costal 
+# combine storm/hail/wind/lightening as they represent extreme weather conditions cause meteorological hazards.
+for (i in 1:nrow(hazards)) {
+  if (stri_detect_fixed(hazards[i,"Hazard.Event"], "Hurricane") == TRUE ) {
+    hazards[i,"Hazard.Event"] = "Hurricane" 
+  } else if ( stri_detect_fixed(hazards[i,"Hazard.Event"], "Coastal") == TRUE ) {
+    hazards[i,"Hazard.Event"] = "Coastal" 
+  } else if (stri_detect_fixed((hazards[i,"Hazard.Event"]), "Flooding") == TRUE){
+    hazards[i,"Hazard.Event"] = "Flooding" 
+  } else if (stri_detect_fixed((hazards[i,"Hazard.Event"]), "Storm") == TRUE || 
+             stri_detect_fixed((hazards[i,"Hazard.Event"]), "Hail") == TRUE ||
+             stri_detect_fixed((hazards[i,"Hazard.Event"]), "Wind") == TRUE ||
+             stri_detect_fixed((hazards[i,"Hazard.Event"]), "Lightning") == TRUE  ||
+             stri_detect_fixed((hazards[i,"Hazard.Event"]), "Winter Weather") == TRUE){
+    hazards[i,"Hazard.Event"] = "Severe Weather" 
+  } else if (stri_detect_fixed((hazards[i,"Hazard.Event"]), "Drought") == TRUE || 
+             stri_detect_fixed((hazards[i,"Hazard.Event"]), "Heat") == TRUE) {
+             hazards[i,"Hazard.Event"] = "Drought/Heat" 
+  }
+}
+
+# removed year and region columns to evaluate the historical event's clustering regardless of time and place
+hazards.agg <- hazards %>%
+  dplyr::select(-c(Year, Region))
+
+hazards.agg2 =  hazards.agg %>% 
+  group_by(Hazard.Event) %>% 
+  summarize(Property.Damage.agg = sum(Property.Damage), 
+         Injuries.agg = sum(Injuries),Fatalities.agg = sum(Fatalities),
+         Freq = n()) %>%
+  mutate(Property.Damage.avg = Property.Damage.agg/Freq , 
+         Injuries.avg = Injuries.agg/Freq,Fatalities.avg =Fatalities.agg/Freq) %>%
+  remove_rownames %>% column_to_rownames(var="Hazard.Event")
+
+# drop fog/landslide due to its scarcity 
+hazards.agg2 = hazards.agg2[!(row.names(hazards.agg2) %in% c("Fog","Landslide")),]
+```
+**Event's clustering via kmeans**
+```{r}
+df = scale(hazards.agg2)
+k4 <- kmeans(df[,c("Property.Damage.avg", "Fatalities.avg","Injuries.avg","Freq")], centers = 3)
+
+distance <- get_dist(df)
+```
+```{r, echo=FALSE}
+fviz_cluster(k4, df, geom = "text")
+```
+
+
+
+
+
+# 2. Goodness_of_Fit_Tests ####
+```{r, warning=FALSE, message=FALSE}
+# Setting up the environment, load the necessary packages
+library(actuar)
+library(dplyr)
+library(EnvStats)
+library(fitdistrplus)
+library(kableExtra)
+library(knitr)
+library(ggplot2)
+library(goftest)
+library(MASS)
+library(tidyr)
+```
+**Setting up and data preparation**
+```{r, warning=FALSE}
+options(scipen=999)
+set.seed(123)
+
+# load data
+load(file = "census.RData")
+load(file = "hazards.RData")
+
+# filtering non-impacting hazards
+hazards <- hazards %>% arrange(Year) %>% filter(Property.Damage != 0)
+# convert census type such that it could be read
+census[,] <- sapply(census[, ], as.numeric) 
+str(census)
+
+# create clustering
+clusters <- hazards %>%
+  mutate(Hazard.Event = 
+           recode(Hazard.Event, 
+                  "Hail/ Wind" = "Severe Weather",
+                  "Winter Weather"= "Severe Weather",
+                  "Wind" = "Severe Weather", 
+                  "Hail/ Severe Storm/Thunder Storm" = "Severe Weather",
+                  "Severe Storm/Thunder Storm" = "Severe Weather", 
+                  "Hail" = "Severe Weather", 
+                  "Severe Storm/Thunder Storm/ Wind" = "Severe Weather",
+                  "Lightning" = "Severe Weather",
+                  "Lightning/ Wind" = "Severe Weather",
+                  "Tornado"  = "Tornado",
+                  "Coastal/ Wind" = "Severe Weather",
+                  "Hurricane/Tropical Storm" = "Hurricane",
+                  "Flooding" = "Flooding",
+                  "Hail/ Lightning/ Wind" = "Severe Weather",
+                  "Hail/ Severe Storm/Thunder Storm/ Wind" = "Severe Weather",
+                  "Lightning/ Severe Storm/Thunder Storm" = "Severe Weather",
+                  "Wildfire" = "Wildfire",
+                  "Hail/ Lightning/ Severe Storm/Thunder Storm" = "Severe Weather",
+                  "Hail/ Lightning/ Severe Storm/Thunder Storm/ Wind" = "Severe Weather",
+                  "Tornado/ Wind" = "Tornado",
+                  "Hail/ Tornado/ Wind" = "Tornado",
+                  "Lightning/ Severe Storm/Thunder Storm/ Wind" = "Severe Weather",
+                  "Severe Storm/Thunder Storm/ Winter Weather" = "Severe Weather",
+                  "Wind/ Winter Weather" = "Severe Weather",
+                  "Coastal/ Hurricane/Tropical Storm/ Wind" = "Hurricane",
+                  "Severe Storm/Thunder Storm/ Wind/ Winter Weather" = "Severe Weather",
+                  "Flooding/ Severe Storm/Thunder Storm" = "Flooding",
+                  "Coastal" = "Coastal",
+                  "Hail/ Lightning" = "Severe Weather",
+                  "Flooding/ Lightning/ Severe Storm/Thunder Storm" = "Flooding",
+                  "Heat" = "Drought/ Heat",
+                  "Drought/ Heat" = "Drought/ Heat",
+                  "Flooding/ Severe Storm/Thunder Storm/ Wind" = "Flooding",
+                  "Flooding/ Wind" = "Flooding",
+                  "Drought" = "Drought/ Heat",
+                  "Hurricane/Tropical Storm/ Severe Storm/Thunder Storm" = "Hurricane",
+                  "Coastal/ Flooding" = "Coastal",
+                  "Flooding/ Lightning" = "Flooding",
+                  "Coastal/ Severe Storm/Thunder Storm/ Wind" = "Coastal",
+                  "Coastal/ Severe Storm/Thunder Storm" = "Coastal",
+                  "Coastal/ Flooding/ Severe Storm/Thunder Storm/ Wind" = "Coastal",
+                  "Lightning/ Tornado/ Wind" = "Tornado",
+                  "Flooding/ Lightning/ Wind" = "Flooding",
+                  "Flooding/ Hail"= "Flooding",
+                  "Hail/ Tornado" = "Tornado",
+                  "Hail/ Severe Storm/Thunder Storm/ Wind/ Winter Weather" = "Severe Weather",
+                  "Coastal/ Hurricane/Tropical Storm/ Severe Storm/Thunder Storm/ Wind" = "Hurricane",
+                  "Flooding/ Hail/ Wind"= "Flooding",
+                  "Fog" = "Fog",
+                  "Severe Storm/Thunder Storm - Wind" = "Severe Weather")) %>%
+  filter(Hazard.Event != "Fog")
+
+summary(clusters)
+```
+  
+_Identified Hazard Event based on the clustering_  
+```{r, echo=FALSE}
+(kable(unique(clusters$Hazard.Event), "pipe", col.names = "Hazard Events", align = "c"))
+```
+### Hazard Analysis
+##### Frequency by hazard to determine the level of hazard
+```{r}
+frequency_hazard <- clusters %>% 
+  group_by(clusters$Hazard.Event) %>% 
+  summarise(events.pa = n(), prop_damage = sum(Property.Damage),
+            damage_per_event = sum(Property.Damage)/n(), risk_level =
+              ifelse(damage_per_event <= 1000000,"minor",
+                     ifelse(damage_per_event<= 10000000,"medium","major")))
+
+## find the mean of losses for each risk level
+minor_mean <- frequency_hazard %>% 
+    group_by(risk_level) %>% 
+    filter(risk_level == "minor") %>% 
+    summarise(dam = mean(damage_per_event)) #517881
+
+medium_mean <- frequency_hazard %>% 
+  group_by(risk_level) %>% 
+  filter(risk_level == "medium") %>% 
+  summarise(dam = mean(damage_per_event)) #4345546
+
+major_mean <- frequency_hazard %>% 
+  group_by(risk_level) %>% 
+  filter(risk_level == "major") %>% 
+  summarise(dam = mean(damage_per_event)) #134796018
+
+## assign weighting for each risk
+damage_table <- rbind(minor_mean, medium_mean, major_mean)
+colnames(damage_table) <- c("Risk Level", "Average Damage")
+kable(damage_table, align = "cr") %>%
+  kable_styling(full_width = FALSE)
+
+weighting_minor <- as.numeric(damage_table[1,2]/sum(damage_table[,2]))
+weighting_medium <- as.numeric(damage_table[2,2]/sum(damage_table[,2]))
+weighting_major <- as.numeric(damage_table[3,2]/sum(damage_table[,2]))
+## check
+sum(weighting_minor+weighting_medium+weighting_major)
+```
+##### Frequency by Region
+```{r}
+frequency_region <- clusters %>% 
+  group_by(Region,Year) %>% 
+  dplyr::summarise(tot_minor = sum(Hazard.Event == "Severe Weather"),
+                   tot_medium = (sum(Hazard.Event == "Coastal")+
+                                   sum( Hazard.Event == "Drought/ Heat")+
+                                   sum(Hazard.Event == "Flooding")+
+                                   sum(Hazard.Event == "Tornado")),
+                   tot_major = (sum(Hazard.Event == "Wildfire")+
+                                  sum( Hazard.Event == "Hurricane")),
+                   tot_event = tot_minor + tot_medium + tot_major,
+                   prop_damage = sum(Property.Damage), .groups='drop')
+
+## quantify the region to low risk, med risk and high risk
+# checking per region the no of minor, med and major risk and the prop damage
+analyse_reg1 <- frequency_region %>% 
+  filter(Region==1) %>% 
+  summarise(Region = "Region 1", 
+            minor = sum(tot_minor), medium = sum(tot_medium),
+            major = sum(tot_major), sum_damage = sum(prop_damage))
+
+analyse_reg2 <- frequency_region %>% 
+  filter(Region==2) %>% 
+  summarise(Region ="Region 2",
+            minor = sum(tot_minor), medium = sum(tot_medium),
+            major = sum(tot_major), sum_damage = sum(prop_damage))
+
+analyse_reg3 <- frequency_region %>% 
+  filter(Region==3) %>% 
+  summarise(Region ="Region 3",
+            minor = sum(tot_minor), medium = sum(tot_medium),
+            major = sum(tot_major), sum_damage = sum(prop_damage))
+
+analyse_reg4 <- frequency_region %>% 
+  filter(Region==4) %>% 
+  summarise(Region ="Region 4",
+            minor = sum(tot_minor), medium = sum(tot_medium),
+            major = sum(tot_major), sum_damage = sum(prop_damage))
+
+analyse_reg5 <- frequency_region %>% 
+  filter(Region==5) %>% 
+  summarise(Region ="Region 5",
+            minor = sum(tot_minor), medium = sum(tot_medium),
+            major = sum(tot_major), sum_damage = sum(prop_damage))
+
+analyse_reg6 <- frequency_region %>% 
+  filter(Region==6) %>% 
+  summarise(Region ="Region 6",
+            minor = sum(tot_minor), medium = sum(tot_medium),
+            major = sum(tot_major), sum_damage = sum(prop_damage))
+
+region_analysis <- rbind(analyse_reg1,analyse_reg2,analyse_reg3,analyse_reg4,analyse_reg5,analyse_reg6)
+colnames(region_analysis)[5] <- "Total Damage"
+kable(region_analysis) %>% 
+  kable_styling(full_width = F)
+
+# find the mean and median for each classes of event per region
+minor_med <- median(region_analysis$minor) #379
+medium_med <- median(region_analysis$medium) #117.5
+major_med <- median(region_analysis$major) #11
+
+minor_mean <- mean(region_analysis$minor) #369.833
+medium_mean <- mean(region_analysis$medium) #121
+major_mean <- mean(region_analysis$major) #14.333
+
+damage_r1 <- region_analysis %>% filter(Region == "Region 1") %>%
+  summarise(damage = minor*weighting_minor + medium*weighting_medium +
+              major*weighting_major)
+damage_r2 <- region_analysis %>% filter(Region == "Region 2") %>%
+  summarise(damage = minor*weighting_minor + medium*weighting_medium +
+              major*weighting_major)
+damage_r3 <- region_analysis %>% filter(Region == "Region 3") %>%
+  summarise(damage = minor*weighting_minor + medium*weighting_medium +
+              major*weighting_major)
+damage_r4 <- region_analysis %>% filter(Region == "Region 4") %>%
+  summarise(damage = minor*weighting_minor + medium*weighting_medium +
+              major*weighting_major)
+damage_r5 <- region_analysis %>% filter(Region == "Region 5") %>%
+  summarise(damage = minor*weighting_minor + medium*weighting_medium +
+              major*weighting_major)
+damage_r6 <- region_analysis %>% filter(Region == "Region 6") %>%
+  summarise(damage = minor*weighting_minor + medium*weighting_medium +
+              major*weighting_major)
+
+reg_damage_analysis <- rbind(damage_r1, damage_r2, damage_r3, damage_r4, damage_r5, damage_r6)
+
+reg_damage_analysis <- tibble::rownames_to_column(reg_damage_analysis, "Region")
+colnames(reg_damage_analysis)[2] <- "Adj. Freq"
+
+kable(reg_damage_analysis, align = "cr", caption = "Weight Adjusted Hazard's Frequency") %>% 
+  kable_styling(full_width = F)
+
+quantile(reg_damage_analysis$`Adj. Freq`,c(.33, .67))
+#     33%      67% 
+# 14.74977 16.65021 
+
+region_risk <- ifelse(reg_damage_analysis$`Adj. Freq` <=
+                        quantile(reg_damage_analysis$`Adj. Freq`,c(.33)), "Low Risk",
+                ifelse(reg_damage_analysis$`Adj. Freq` <=
+                        quantile(reg_damage_analysis$`Adj. Freq`,c(.67)), "Medium Risk","High Risk"))
+
+region_risk <- data.frame(region_risk)
+
+region_risk <- tibble::rownames_to_column(region_risk, "Region")
+colnames(region_risk)[2] <- "Risk Level"
+
+kable(region_risk, align = "cl", caption = "Region Risk Level") %>%
+  kable_styling(full_width = F)
+
+```                     
+  
+### Census Data Analysis
+
