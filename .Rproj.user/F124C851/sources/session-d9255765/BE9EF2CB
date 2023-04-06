@@ -3,7 +3,7 @@
     "path": "~/Documents/GitHub/ACTL4001/Test/Trial 1.Rmd",
     "project_path": "Trial 1.Rmd",
     "type": "r_markdown",
-    "hash": "0",
+    "hash": "2660999503",
     "contents": "",
     "dirty": false,
     "created": 1680604086922.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Sourcephrcg3i96ix5",
-        "cursorPosition": "62,30",
-        "scrollLine": "34"
+        "cursorPosition": "400,27",
+        "scrollLine": "360"
     },
     "folds": "",
-    "lastKnownWriteTime": 1680584516,
+    "lastKnownWriteTime": 1680785375,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1680584516,
+    "last_content_update": 1680785375485,
     "read_only": false,
     "read_only_alternatives": []
 }

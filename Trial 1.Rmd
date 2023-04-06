@@ -398,4 +398,4 @@ kable(region_risk, align = "cl", caption = "Region Risk Level") %>%
 ```                     
   
 ### Census Data Analysis
-
+go to [this link](/Trial-2)
