@@ -1,0 +1,5 @@
+"0",""
+"0","pop_table <- t(rbind(pop_2021, gdp_2020, temp_housing_cost_wdis, median_mthly_housing_cost))"
+"0","colnames(pop_table) <- c(""Population_2021"", ""GDP_2020( P1,000 )"", ""Temp Housing Cost After Disaster"", ""Median Mthly Housing Cost (P pp per mth)"" )"
+"0","kable(pop_table) %>%"
+"0","  kable_styling(full_width = F)"

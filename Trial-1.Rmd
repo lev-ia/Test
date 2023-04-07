@@ -1,7 +1,10 @@
 ---
 title: "Trial 1"
 author: "Levia"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    theme: united
 date: "2023-04-03"
 ---
 
@@ -10,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## R Markdown
+
+[Back to README](/Test) | [Next R Code](/Test/Trial-2)
 
 This is a trial for R Markdown 
 Today is 4 April 2023
@@ -26,6 +31,7 @@ library(factoextra)
 library(fitdistrplus)
 library(ggplot2)
 library(goftest)
+library(kableExtra)
 library(MASS)
 library(randomForest)
 library(readr)
@@ -398,4 +404,343 @@ kable(region_risk, align = "cl", caption = "Region Risk Level") %>%
 ```                     
   
 ### Census Data Analysis
+```{r, message=FALSE}
+# Extract the variables
+pop_2021 <- census[1,]
+pop_2020 <- census[2,]
+gdp_2020 <- census[28,]
+temp_housing_cost_wdis <- census[30,]
+median_mthly_housing_cost<- census[9,]
+person_per_hh <- census[19,]
+no_hh <- census[18,]
+housing_units <- census[6,]
+owner_occupied_housing_units <- census[7,]
+```
+
+*Evaluating the property value*
+```{r}
+
+property.value <- census[-c(1:30), ] %>% 
+# remove unwanted rows
+  mutate(across(Region.1:Region.6, ~. *100))
+  # convert from decimal to percentage
+
+PVD_df <- data.frame(
+  Region_1 = c(property.value[1,1], sum(property.value[c(2:4), 1]), sum(property.value[c(5:7), 1]), sum(property.value[c(8:10), 1]), sum(property.value[c(11:13), 1])),
+  Region_2 = c(property.value[1,2], sum(property.value[c(2:4), 2]), sum(property.value[c(5:7), 2]), sum(property.value[c(8:10), 2]), sum(property.value[c(11:13), 2])),
+  Region_3 = c(property.value[1,3], sum(property.value[c(2:4), 3]), sum(property.value[c(5:7), 3]), sum(property.value[c(8:10), 3]), sum(property.value[c(11:13), 3])), 
+  Region_4 = c(property.value[1,4], sum(property.value[c(2:4), 4]), sum(property.value[c(5:7), 4]), sum(property.value[c(8:10), 4]), sum(property.value[c(11:13), 4])),
+  Region_5 = c(property.value[1,5], sum(property.value[c(2:4), 5]), sum(property.value[c(5:7), 5]), sum(property.value[c(8:10), 5]), sum(property.value[c(11:13), 5])),
+  Region_6 = c(property.value[1,6], sum(property.value[c(2:4), 6]), sum(property.value[c(5:7), 6]), sum(property.value[c(8:10), 6]), sum(property.value[c(11:13), 6])), 
+  row.names = c("<50", "50-199", "200-399", "400-999", ">1000"))
+
+PVD_df <- tibble::rownames_to_column(PVD_df, "PVD") # change format: rownames to column so ggplot2 can plot
+
+PVD_final <- pivot_longer(PVD_df, cols=2:7, names_to = "Region", values_to = "Percent")
+```
+```{r, echo=FALSE}
+kable(PVD_df, format = "pipe")
+ggplot(PVD_final, 
+       aes(x = factor(PVD, level = c("<50", "50-199","200-399",
+                                     "400-999", ">1000")), 
+           y = Percent, fill = Region)) +
+    geom_bar(stat ="identity", 
+             position = position_dodge(), 
+             colour = "black") +
+    scale_fill_brewer() +
+    theme_minimal() +
+    ggtitle("Property Value Distribution by Region") +
+    xlab("Property Value (P1000)") +
+    ylab("Percentage of Homes in Value Category")
+
+pop_table <- t(rbind(pop_2021, gdp_2020))
+colnames(pop_table) <- c("Population_2021", "GDP_2020( P1,000 )")
+kable(pop_table) %>%
+  kable_styling(full_width = F)
+```
+
+*Extra details*
+```{r, warning=FALSE, message=FALSE}
+# find out how many person live alone and with fam
+(person_with_fam <- person_per_hh*no_hh)
+
+(person_living_alone <- pop_2020-person_with_fam )
+
+# find out no of houses for rent
+(rent_house <- housing_units - owner_occupied_housing_units )
+
+# no of person per house in the region
+(no_person_per_house <- pop_2020/housing_units)
+
+# check if there is enough no of accommodation for voluntary relocation
+(person_per_hh)
+# assume one house can have as much people as persons in a hh
+# assume those living alone is renting
+
+# no of available space for rent 
+tot_rental <- person_per_hh*rent_house
+tot_rental_occupied <- person_living_alone
+tot_rental_available <- tot_rental - tot_rental_occupied
+
+# population
+pop_table <- t(rbind(pop_2020, gdp_2020, temp_housing_cost_wdis, median_mthly_housing_cost))
+colnames(pop_table) <- c("Population_2020", "GDP_2020( P1,000 )", "Temp Housing Cost After Disaster", "Median Mthly Housing Cost (P pp per mth)" )
+
+
+cens_df <- (rbind(pop_2020, person_with_fam, person_living_alone, rent_house, tot_rental_occupied, tot_rental_available))
+rownames(cens_df) <- c("Population 2020", "Person with fam", "Person live alone", "No House for rent", "Rental Occupied", "Rental Available")
+kable(cens_df, format = "pipe")
+```
+
+### Frequency and Severity Analysis
+#### Frequency
+```{r, warning=FALSE, message=FALSE}
+# frequency by year
+
+frequency <- hazards %>%
+  group_by(Year) %>% 
+  dplyr::summarise(events.pa = n())
+
+#poisson
+fit_poisson <- fitdistr(frequency$events.pa, "Poisson")
+
+ks_poisson <- ks.test(unique(frequency$events.pa), "ppois", lambda = 49.704918)
+ad_poisson <- ad.test(frequency$events.pa, "ppois", lambda = 49.704918)
+cvm_poisson <- cvm.test(frequency$events.pa, "ppois", lambda = 49.704918)
+
+#negative binomial
+fit_nbin <- fitdistr(frequency$events.pa, "negative binomial")
+
+ks_nbin <- ks.test(unique(frequency$events.pa), "pnbinom", size = 1.948557, mu = 49.704918)
+ad_nbin <- ad.test(frequency$events.pa, "pnbinom", size = 1.948557, mu = 49.704918)
+cvm_nbin <- cvm.test(frequency$events.pa, "pnbinom", size = 1.948557, mu = 49.704918)
+
+# We find the parameters as follow
+# Parameters
+par_poi <- data.frame(fit_poisson$estimate, fit_poisson$sd)
+par_poi <- t(par_poi)
+
+par_nb <- data.frame(fit_nbin$estimate, fit_nbin$sd)
+par_nb <- t(par_nb)
+
+par_fr <- cbind(par_poi, par_nb)
+rownames(par_fr) <- c("Estimate", "St. Dev")
+kable(par_fr, format = "pipe") %>%
+  kable_styling(full_width = F)
+
+# p-value of tests
+tests <- c("Kolmogorov-Smirnov", "Anderson-Darling", "Cramer-von Mises")
+
+poi_pval <- c(ks_poisson$p.value, ad_poisson$p.value, cvm_poisson$p.value)
+nb_pval <- c(ks_nbin$p.value, ad_nbin$p.value, cvm_nbin$p.value)
+fr_pval <- data.frame(poi_pval, nb_pval)
+rownames(fr_pval) <- tests
+colnames(fr_pval) <- c("Poisson", "Neg. Binom")
+# p-value statistics of the tests shows that there's not enough evidence to reject that the frequency follows negative binomial distribution
+kable(fr_pval, format = "pipe") %>%
+  kable_styling(full_width = F)
+```
+#### Severity
+```{r, warning=FALSE, message=FALSE}
+severity <- hazards %>% dplyr::select(Property.Damage)
+
+ggplot(severity, aes(x = Property.Damage)) + geom_histogram(bins = 100) + xlim(c(0, 1000000)) # very skewed distribution
+
+# First, fit a Gamma on severity
+FG <- egamma(severity$Property.Damage, method = "mle")
+
+ggplot(severity, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 1.001714e+00, rate = 1/6.534646e+06), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Gamma") +
+    xlab("Theoretical") +
+    ylab("Sample")
+# MLE gamma fit highly underestimates damages - try log of gamma
+
+# Next, try LogGamma
+sevlog <- severity %>% mutate(Property.Damage = log(Property.Damage))
+FGL <- egamma(sevlog$Property.Damage, method = "mle")
+
+ggplot(sevlog, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 14.8283973, rate = 1/0.7073224), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Ln(Damages) ~ Gamma") +
+    xlab("Theoretical") +
+    ylab("Sample")
+
+# much better fit! Now try LogNormal
+
+FL <- fitdistr(severity$Property.Damage, "lognormal")
+
+ggplot(severity, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qlnorm, dparams = c(meanlog = 10.48845700, sdlog = 2.61966147), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Lognormal") +
+    xlab("Theoretical") +
+    ylab("Sample")
+
+# LogNormal also systematically underestimates damages
+
+# Now split by region (under LogGamma):
+```
+```{r, warning=FALSE, message=FALSE, echo=FALSE, fig.show="hold", out.width="50%"}
+sev_r1 <- hazards  %>% 
+  filter(Region == "1") %>% 
+  dplyr::select(Property.Damage) %>% 
+  mutate(Property.Damage = log(Property.Damage))  
+sev_r2 <- hazards  %>% 
+  filter(Region == "2") %>% 
+  dplyr::select(Property.Damage) %>% 
+  mutate(Property.Damage = log(Property.Damage))
+sev_r3 <- hazards  %>% 
+  filter(Region == "3") %>% 
+  dplyr::select(Property.Damage) %>% 
+  mutate(Property.Damage = log(Property.Damage))
+sev_r4 <- hazards  %>% 
+  filter(Region == "4") %>% 
+  dplyr::select(Property.Damage) %>% 
+  mutate(Property.Damage = log(Property.Damage))
+sev_r5 <- hazards  %>% 
+  filter(Region == "5") %>% 
+  dplyr::select(Property.Damage) %>% 
+  mutate(Property.Damage = log(Property.Damage))
+sev_r6 <- hazards  %>% 
+  filter(Region == "6") %>% 
+  dplyr::select(Property.Damage) %>%
+  mutate(Property.Damage = log(Property.Damage))
+
+FG1 <- egamma(sev_r1$Property.Damage, method = "mle")
+FG2 <- egamma(sev_r2$Property.Damage, method = "mle")
+FG3 <- egamma(sev_r3$Property.Damage, method = "mle")
+FG4 <- egamma(sev_r4$Property.Damage, method = "mle")
+FG5 <- egamma(sev_r5$Property.Damage, method = "mle")
+FG6 <- egamma(sev_r6$Property.Damage, method = "mle")
+
+
+ggplot(sev_r1, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 13.9447973, scale = 0.7622203), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Log Gamma R1") +
+    xlab("Theoretical") +
+    ylab("Sample")
+
+ggplot(sev_r2, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 17.9265132, scale = 0.6116642), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Log Gamma R2") +
+    xlab("Theoretical") +
+    ylab("Sample")
+
+ggplot(sev_r3, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 14.2931748, scale = 0.7238527), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Log Gamma R3") +
+    xlab("Theoretical") +
+    ylab("Sample")
+
+ggplot(sev_r4, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 15.7694419, scale = 0.6494495), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Log Gamma R4") +
+    xlab("Theoretical") +
+    ylab("Sample")
+
+ggplot(sev_r5, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 15.0962915, scale = 0.6756838), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Log Gamma R5") +
+    xlab("Theoretical") +
+    ylab("Sample")
+
+ggplot(sev_r6, aes(sample = Property.Damage)) +
+    stat_qq(distribution = qgamma, dparams = c(shape = 11.5229591, scale = 0.8736234), colour = "#00BFC4", size = 1) +
+    geom_abline(slope=1, intercept = 0) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 13.5)) +
+    ggtitle("Log Gamma R6") +
+    xlab("Theoretical") +
+    ylab("Sample")
+```
+```{r, warning=F, message=F}
+# Anderson-Darling Goodness of Fit test on each region above
+```
+```{r,warning=FALSE, message=FALSE, echo=FALSE}
+ad1 <- ad.test(sev_r1$Property.Damage, "pgamma", shape = 13.9447973, scale = 0.7622203)
+ad2 <- ad.test(sev_r2$Property.Damage, "pgamma", shape = 17.9265132, scale = 0.6116642)
+ad3 <- ad.test(sev_r3$Property.Damage, "pgamma", shape = 14.2931748, scale = 0.7238527)
+ad4 <- ad.test(sev_r4$Property.Damage, "pgamma", shape = 15.7694419, scale = 0.6494495)
+ad5 <- ad.test(sev_r5$Property.Damage, "pgamma", shape = 15.0962915, scale = 0.6756838)
+ad6 <- ad.test(sev_r6$Property.Damage, "pgamma", shape = 11.5229591, scale = 0.8736234)
+
+# p-value of each region AD tests
+reg_par <- data.frame(FG1$parameters, FG2$parameters, FG3$parameters, FG4$parameters, FG5$parameters, FG6$parameters)
+colnames(reg_par) <- c(1:6)
+
+kable(reg_par, align = "rrrrrr", caption = "Parameters") %>%
+  kable_styling(full_width = F)
+
+pval_reg <- c(ad1$p.value, ad2$p.value, ad3$p.value, ad4$p.value, ad5$p.value, ad6$p.value)
+pval_reg <- data.frame(pval_reg)
+pval_reg <- rownames_to_column(pval_reg)
+colnames(pval_reg) <- c("Region","p-value")
+
+kable(pval_reg, align = "cr", caption = "AD Test per Region") %>%
+  kable_styling(full_width = F)
+```
+```{r} 
+# not great, but good enough 
+```
+# 3. Monte Carlo Simulation
+### Average Aggregate loss in n-years, using MLE Parameters
+```{r, warning=F}
+n_years <- 10 # feel free to adjust: e.g. if you want aggregate loss in 5 years, put n_years <- 5
+n_iterations <- 100000 # number of Monte_Carlo simulations: also feel free to adjust.
+size <- 1.948557
+mu <- 49.704918
+shapelog <- 14.829296
+ratelog <- 1.413602
+
+sev <- c()
+
+for (i in 1:n_iterations) {
+  
+  for (i in 1:n_years) {
+    freq_vec <- rnbinom(n_years, size = size, mu = mu)
+    sev_obs <- sum(rlgamma(freq_vec[i], shapelog = shapelog, ratelog = ratelog))
+  }
+  
+  sev <- append(sev, sev_obs)
+  
+}
+
+#sanity check: mean aggregate loss in n years / cumulative historical property damages: should be about = n_years / 60
+(mean(sev)/sum(hazards$Property.Damage) )
+#I got 0.06579576. For n_years = 10, this should be about 0.1667
+#Possible reason for small value: 
+#the historical losses include some years where total losses are extreme, which isn't captured by just taking mean(sev)
+
+sev_df <- data.frame(sev)
+ggplot(sev_df, aes(x = sev)) + 
+    geom_histogram(bins = 100) +
+    xlim(c(0, 1000000000)) + ylim(c(0,15000)) +
+    ggtitle("Aggregate Loss across Instances") +
+    xlab("Aggregate Loss in N Years") +
+    ylab("Sample")
+```
 

@@ -1,0 +1,42 @@
+# Reset R and Clear R
+
+# Setting up ####
+.rs.restartR() # Restart R
+
+# Install packages
+list.of.packages <- c("actuar",
+                      "diagram",
+                      "dplyr",
+                      "EnvStats",
+                      "fitdistrplus",
+                      "ggplot2",
+                      "ggthemes",
+                      "goftest",
+                      "gsl",
+                      "KMsurv",
+                      "librarian",
+                      "lifecontingencies",
+                      "markovchain",
+                      "MASS",
+                      "moments",
+                      "psych",
+                      "readr",
+                      "Renext",
+                      "stats",
+                      "stats4",
+                      "survival",
+                      "survivalAnalysis",
+                      "survminer",
+                      "tidyr",
+                      "tidyverse")
+new.packages <- list.of.packages[!(list.of.packages %in% 
+                                     installed.packages() [,"Package"])]
+if(length(new.packages)) install.packages(new.packages, dependencies = TRUE)
+
+# Loading library
+librarian::shelf(list.of.packages)
+
+# Clear environment and console
+rm(list = ls())
+graphics.off()
+cat("\f")

@@ -1,0 +1,1 @@
+"0","(kable(unique(clusters$Hazard.Event), ""pipe"", col.names = ""Hazard Events"", align = ""c""))"
